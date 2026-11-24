@@ -1,0 +1,11 @@
+classpath:C:\Users\Symon\.m2\repository\com\mysql\mysql-connector-j\8.4.0\mysql-connector-j-8.4.0.jar	2533399:1795475665071
+classpath:C:\Users\Symon\.m2\repository\com\google\protobuf\protobuf-java\3.25.1\protobuf-java-3.25.1.jar	1875070:1795475665410
+classpath:C:\Users\Symon\.m2\repository\org\mindrot\jbcrypt\0.4\jbcrypt-0.4.jar	17429:1795475665311
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-controls\21.0.6\javafx-controls-21.0.6.jar	306:1795475941088
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-controls\21.0.6\javafx-controls-21.0.6-win.jar	2585171:1795475941758
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-graphics\21.0.6\javafx-graphics-21.0.6.jar	306:1795475941245
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-graphics\21.0.6\javafx-graphics-21.0.6-win.jar	5942324:1795475942129
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-base\21.0.6\javafx-base-21.0.6.jar	302:1795475941359
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-base\21.0.6\javafx-base-21.0.6-win.jar	753980:1795475941429
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-fxml\21.0.6\javafx-fxml-21.0.6.jar	302:1795475941370
+classpath:C:\Users\Symon\.m2\repository\org\openjfx\javafx-fxml\21.0.6\javafx-fxml-21.0.6-win.jar	130176:1795475941516
