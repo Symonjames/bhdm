@@ -3,3 +3,8 @@ target/
 bhdm/
 .vscode/
 *.class
+
+target/
+bhdm/
+.vscode/
+*.class
