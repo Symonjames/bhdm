@@ -5,6 +5,7 @@ import com.bhdm.config.DatabaseConnection;
 import com.bhdm.dao.AuditLogDAO;
 import com.bhdm.model.User;
 import com.bhdm.service.AuthenticationService;
+import com.bhdm.service.SessionManager;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
@@ -46,6 +47,7 @@ public class LoginView extends VBox {
         userLabel.getStyleClass().add("field-label");
         username.setPromptText("Enter your username");
         username.setMaxWidth(Double.MAX_VALUE);
+        username.setOnAction(e -> authenticate());
         userGroup.getChildren().addAll(userLabel, username);
 
         VBox passGroup = new VBox(6);
@@ -53,6 +55,7 @@ public class LoginView extends VBox {
         passLabel.getStyleClass().add("field-label");
         password.setPromptText("Enter your password");
         password.setMaxWidth(Double.MAX_VALUE);
+        password.setOnAction(e -> authenticate());
         passGroup.getChildren().addAll(passLabel, password);
 
         Button login = new Button("Sign In");
@@ -69,7 +72,15 @@ public class LoginView extends VBox {
         Button signUp = new Button("Create Account / Sign Up");
         signUp.setMaxWidth(Double.MAX_VALUE);
         signUp.getStyleClass().add("btn-link");
-        signUp.setOnAction(e -> app.showRegister());
+        signUp.setOnAction(e -> {
+            try {
+                SessionManager.logout();
+                app.showRegister();
+            } catch (Throwable ex) {
+                ex.printStackTrace();
+                showStatus("Unable to open Sign Up: " + ex.getMessage(), false);
+            }
+        });
 
         status.setWrapText(true);
         status.setMaxWidth(Double.MAX_VALUE);
@@ -95,6 +106,7 @@ public class LoginView extends VBox {
             DatabaseConnection.testConnection();
             showStatus("Connected to barangay_health_center_db.", true);
         } catch (SQLException ex) {
+            ex.printStackTrace();
             showStatus("Database connection failed: " + ex.getMessage(), false);
         }
     }
@@ -110,13 +122,15 @@ public class LoginView extends VBox {
                 showStatus("Invalid credentials or inactive account.", false);
                 return;
             }
+            SessionManager.login(user);
             try {
                 new AuditLogDAO().recordLogin(user.getUserId());
-            } catch (SQLException ignored) {
-                // Login proceeds even if audit insert fails
+            } catch (SQLException ex) {
+                ex.printStackTrace();
             }
             app.showDashboard(user.getUserId(), user.getFullName(), user.getRoleName());
-        } catch (SQLException ex) {
+        } catch (Throwable ex) {
+            ex.printStackTrace();
             showStatus("Login failed: " + ex.getMessage(), false);
         }
     }

@@ -40,6 +40,7 @@ public class App extends Application {
             try {
                 String[][] defaultRoles = {
                         {"Admin", "Full system administrator access"},
+                        {"Staff", "Barangay health center staff (view-only access)"},
                         {"Nurse", "Barangay health center registered nurse"},
                         {"Midwife", "Barangay health center midwife"},
                         {"BHW", "Barangay Health Worker"},
@@ -122,11 +123,22 @@ public class App extends Application {
     }
 
     public void showRegister() {
-        Scene scene = new Scene(new com.bhdm.view.RegisterView(this), 580, 740);
-        applyStylesheet(scene);
-        stage.setScene(scene);
-        stage.setMinWidth(520);
-        stage.setMinHeight(660);
+        try {
+            Scene scene = new Scene(new com.bhdm.view.RegisterView(this), 580, 740);
+            applyStylesheet(scene);
+            stage.setScene(scene);
+            stage.setMinWidth(520);
+            stage.setMinHeight(660);
+        } catch (Throwable ex) {
+            ex.printStackTrace();
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.ERROR,
+                    "Unable to open registration screen: " + ex.getMessage(),
+                    javafx.scene.control.ButtonType.OK
+            );
+            alert.setHeaderText("Navigation Error");
+            alert.showAndWait();
+        }
     }
 
     public void showDashboard(int userId, String fullName, String roleName) {

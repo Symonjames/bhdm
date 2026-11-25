@@ -12,7 +12,7 @@ Run [`seed_admin.sql`](./seed_admin.sql) after importing the schema to create th
 
 ## Run
 
-Use JDK 21 or newer and Maven:
+Use JDK 25 (the current LTS target) and Maven:
 
 ```text
 mvn clean compile

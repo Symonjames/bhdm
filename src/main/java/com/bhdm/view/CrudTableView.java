@@ -2,7 +2,9 @@ package com.bhdm.view;
 
 import com.bhdm.App;
 import com.bhdm.config.DatabaseConnection;
+import com.bhdm.dao.CrudDAO;
 import com.bhdm.service.AuthenticationService;
+import com.bhdm.service.SessionManager;
 import javafx.animation.PauseTransition;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.collections.FXCollections;
@@ -48,6 +50,8 @@ public class CrudTableView extends BorderPane {
 
     private final String tableName;
     private final boolean highlightLowStock;
+    private final boolean readOnly;
+    private final CrudDAO crudDAO = new CrudDAO();
     private final TableView<Map<String, Object>> table = new TableView<>();
     private final TextField search = new TextField();
     private final Label countLabel = new Label("0 records");
@@ -60,6 +64,7 @@ public class CrudTableView extends BorderPane {
     public CrudTableView(String tableName, boolean highlightLowStock) {
         this.tableName = Objects.requireNonNull(tableName);
         this.highlightLowStock = highlightLowStock;
+        this.readOnly = SessionManager.isViewOnly();
         getStyleClass().add("crud-container");
         setTop(toolbar());
         Label loading = new Label("Loading " + pretty(tableName) + "...");
@@ -88,6 +93,8 @@ public class CrudTableView extends BorderPane {
         edit.getStyleClass().add("btn-secondary");
         Button delete = new Button("Delete");
         delete.getStyleClass().add("btn-danger");
+        Button viewDetails = new Button("View Details");
+        viewDetails.getStyleClass().add("btn-ghost");
         Button refresh = new Button("Refresh");
         refresh.getStyleClass().add("btn-ghost");
 
@@ -100,6 +107,14 @@ public class CrudTableView extends BorderPane {
                 showForm(selected);
             }
         });
+        viewDetails.setOnAction(event -> {
+            Map<String, Object> selected = table.getSelectionModel().getSelectedItem();
+            if (selected == null) {
+                showError("Please select a row to view.");
+            } else {
+                showForm(selected);
+            }
+        });
         delete.setOnAction(event -> deleteSelected());
         refresh.setOnAction(event -> loadRows(true));
 
@@ -107,7 +122,20 @@ public class CrudTableView extends BorderPane {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        bar.getChildren().addAll(title, countLabel, spacer, search, add, edit, delete, refresh);
+
+        if (readOnly) {
+            add.setVisible(false);
+            add.setManaged(false);
+            edit.setVisible(false);
+            edit.setManaged(false);
+            delete.setVisible(false);
+            delete.setManaged(false);
+            Label viewOnlyTag = new Label("View-Only");
+            viewOnlyTag.getStyleClass().add("role-badge-viewonly");
+            bar.getChildren().addAll(title, countLabel, viewOnlyTag, spacer, search, viewDetails, refresh);
+        } else {
+            bar.getChildren().addAll(title, countLabel, spacer, search, add, edit, delete, refresh);
+        }
         return bar;
     }
 
@@ -248,32 +276,10 @@ public class CrudTableView extends BorderPane {
         if (columns.isEmpty()) {
             return;
         }
-        String selectColumns = columns.stream().map(info -> quote(info.name)).collect(Collectors.joining(", "));
-        StringBuilder sql = new StringBuilder("SELECT ").append(selectColumns)
-                .append(" FROM ").append(quote(tableName));
-        String term = search.getText().trim();
-        if (!term.isEmpty()) {
-            sql.append(" WHERE CONCAT_WS(' ', ")
-                    .append(columns.stream().map(info -> quote(info.name)).collect(Collectors.joining(", ")))
-                    .append(") LIKE ?");
-        }
-        sql.append(" ORDER BY ").append(quote(primaryKey)).append(" DESC");
-
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-            if (!term.isEmpty()) {
-                statement.setString(1, "%" + term + "%");
-            }
-            try (ResultSet result = statement.executeQuery()) {
-                rows.clear();
-                while (result.next()) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    for (ColumnInfo info : columns) {
-                        row.put(info.name, result.getObject(info.name));
-                    }
-                    rows.add(row);
-                }
-            }
+        List<String> columnNames = columns.stream().map(info -> info.name).toList();
+        try {
+            List<Map<String, Object>> loaded = crudDAO.selectRows(tableName, columnNames, primaryKey, search.getText());
+            rows.setAll(loaded);
             countLabel.setText(rows.size() + " record" + (rows.size() == 1 ? "" : "s"));
             if (showResult) {
                 showInfo("The " + pretty(tableName) + " table was refreshed.");
@@ -285,13 +291,27 @@ public class CrudTableView extends BorderPane {
 
     private void showForm(Map<String, Object> selected) {
         boolean editing = selected != null;
+        if (readOnly && !editing) {
+            showError("Staff accounts have view-only access and cannot add new records.");
+            return;
+        }
+
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle((editing ? "Edit " : "Add ") + pretty(tableName));
-        dialog.setHeaderText((editing ? "Update existing " : "Create new ") + pretty(tableName) + " record");
+        if (readOnly) {
+            dialog.setTitle("View " + pretty(tableName) + " (Read-Only)");
+            dialog.setHeaderText("Record Details — Staff View-Only Mode");
+        } else {
+            dialog.setTitle((editing ? "Edit " : "Add ") + pretty(tableName));
+            dialog.setHeaderText((editing ? "Update existing " : "Create new ") + pretty(tableName) + " record");
+        }
         applyDialogStyles(dialog.getDialogPane());
 
         ButtonType saveButtonType = new ButtonType(editing ? "Save Changes" : "Add Record", ButtonBar.ButtonData.OK_DONE);
-        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveButtonType);
+        if (readOnly) {
+            dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        } else {
+            dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CANCEL, saveButtonType);
+        }
 
         VBox wrapper = new VBox(12);
         Label errorBanner = new Label();
@@ -338,6 +358,9 @@ public class CrudTableView extends BorderPane {
 
             Object currentVal = editing ? selected.get(info.name) : null;
             FormField field = createFormField(info, currentVal, editing);
+            if (readOnly) {
+                field.control.setDisable(true);
+            }
             formFields.put(info.name, field);
 
             VBox inputContainer = new VBox(3);
@@ -362,41 +385,48 @@ public class CrudTableView extends BorderPane {
         wrapper.getChildren().addAll(errorBanner, scroll);
         dialog.getDialogPane().setContent(wrapper);
 
-        Node saveButton = dialog.getDialogPane().lookupButton(saveButtonType);
-        saveButton.getStyleClass().add("btn-primary");
-        Node cancelButton = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
-        if (cancelButton != null) {
-            cancelButton.getStyleClass().add("btn-ghost");
-        }
-
-        saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
-            errorBanner.setVisible(false);
-            errorBanner.setManaged(false);
-            formFields.values().forEach(f -> f.control.getStyleClass().remove("input-error"));
-
-            List<String> validationErrors = validateForm(formFields, editing);
-            if (!validationErrors.isEmpty()) {
-                errorBanner.setText(String.join("\n", validationErrors));
-                errorBanner.setVisible(true);
-                errorBanner.setManaged(true);
-                event.consume();
-                return;
+        if (!readOnly) {
+            Node saveButton = dialog.getDialogPane().lookupButton(saveButtonType);
+            saveButton.getStyleClass().add("btn-primary");
+            Node cancelButton = dialog.getDialogPane().lookupButton(ButtonType.CANCEL);
+            if (cancelButton != null) {
+                cancelButton.getStyleClass().add("btn-ghost");
             }
 
-            try {
-                if (editing) {
-                    update(selected, formFields);
-                } else {
-                    insert(formFields);
+            saveButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+                errorBanner.setVisible(false);
+                errorBanner.setManaged(false);
+                formFields.values().forEach(f -> f.control.getStyleClass().remove("input-error"));
+
+                List<String> validationErrors = validateForm(formFields, editing);
+                if (!validationErrors.isEmpty()) {
+                    errorBanner.setText(String.join("\n", validationErrors));
+                    errorBanner.setVisible(true);
+                    errorBanner.setManaged(true);
+                    event.consume();
+                    return;
                 }
-                loadRows(false);
-            } catch (SQLException | IllegalArgumentException ex) {
-                errorBanner.setText(friendlySqlError(ex));
-                errorBanner.setVisible(true);
-                errorBanner.setManaged(true);
-                event.consume();
+
+                try {
+                    if (editing) {
+                        update(selected, formFields);
+                    } else {
+                        insert(formFields);
+                    }
+                    loadRows(false);
+                } catch (SQLException | IllegalArgumentException | SecurityException ex) {
+                    errorBanner.setText(friendlySqlError(ex));
+                    errorBanner.setVisible(true);
+                    errorBanner.setManaged(true);
+                    event.consume();
+                }
+            });
+        } else {
+            Node closeButton = dialog.getDialogPane().lookupButton(ButtonType.CLOSE);
+            if (closeButton != null) {
+                closeButton.getStyleClass().add("btn-ghost");
             }
-        });
+        }
 
         dialog.showAndWait();
     }
@@ -586,6 +616,7 @@ public class CrudTableView extends BorderPane {
     }
 
     private void insert(Map<String, FormField> formFields) throws SQLException {
+        SessionManager.requireAdminWriteAccess("INSERT into " + tableName);
         List<Map.Entry<ColumnInfo, String>> toInsert = new ArrayList<>();
         for (FormField field : formFields.values()) {
             String raw = field.extractRawValue();
@@ -601,22 +632,18 @@ public class CrudTableView extends BorderPane {
             throw new IllegalArgumentException("Please enter at least one value.");
         }
 
-        String names = toInsert.stream().map(e -> quote(e.getKey().name)).collect(Collectors.joining(", "));
-        String marks = toInsert.stream().map(e -> "?").collect(Collectors.joining(", "));
-        String sql = "INSERT INTO " + quote(tableName) + " (" + names + ") VALUES (" + marks + ")";
-
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        List<String> colNames = toInsert.stream().map(e -> e.getKey().name).toList();
+        crudDAO.executeInsert(tableName, colNames, statement -> {
             int index = 1;
             for (Map.Entry<ColumnInfo, String> entry : toInsert) {
                 bind(statement, index++, entry.getKey(), entry.getValue());
             }
-            statement.executeUpdate();
-        }
+        });
         showInfo("Record added successfully.");
     }
 
     private void update(Map<String, Object> selected, Map<String, FormField> formFields) throws SQLException {
+        SessionManager.requireAdminWriteAccess("UPDATE on " + tableName);
         List<Map.Entry<ColumnInfo, String>> toUpdate = new ArrayList<>();
         for (FormField field : formFields.values()) {
             ColumnInfo info = field.info;
@@ -628,13 +655,13 @@ public class CrudTableView extends BorderPane {
 
             if ("password_hash".equalsIgnoreCase(info.name)) {
                 if (isEmpty) {
-                    continue; // Preserve existing password hash
+                    continue;
                 }
                 if (!isBcryptHash(raw)) {
                     raw = AuthenticationService.hashPassword(raw);
                 }
             } else if (isEmpty && !info.nullable && info.defaultValue != null) {
-                continue; // Preserve existing non-null defaulted column (e.g., timestamps/status)
+                continue;
             }
 
             toUpdate.add(Map.entry(info, raw));
@@ -644,28 +671,26 @@ public class CrudTableView extends BorderPane {
             throw new IllegalArgumentException("No editable columns to update.");
         }
 
-        String setClause = toUpdate.stream()
-                .map(e -> quote(e.getKey().name) + " = ?")
-                .collect(Collectors.joining(", "));
-        String sql = "UPDATE " + quote(tableName) + " SET " + setClause
-                + " WHERE " + quote(primaryKey) + " = ?";
-
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        List<String> colNames = toUpdate.stream().map(e -> e.getKey().name).toList();
+        int updated = crudDAO.executeUpdate(tableName, colNames, primaryKey, statement -> {
             int index = 1;
             for (Map.Entry<ColumnInfo, String> entry : toUpdate) {
                 bind(statement, index++, entry.getKey(), entry.getValue());
             }
             ColumnInfo key = findColumn(primaryKey);
             bind(statement, index, key, String.valueOf(selected.get(primaryKey)));
-            if (statement.executeUpdate() != 1) {
-                throw new SQLException("The selected record no longer exists.");
-            }
+        });
+        if (updated != 1) {
+            throw new SQLException("The selected record no longer exists.");
         }
         showInfo("Record updated successfully.");
     }
 
     private void deleteSelected() {
+        if (readOnly) {
+            showError("Staff accounts have view-only access and cannot delete records.");
+            return;
+        }
         Map<String, Object> selected = table.getSelectionModel().getSelectedItem();
         if (selected == null) {
             showError("Please select a row to delete.");
@@ -684,14 +709,12 @@ public class CrudTableView extends BorderPane {
             return;
         }
 
-        String sql = "DELETE FROM " + quote(tableName) + " WHERE " + quote(primaryKey) + " = ?";
-        try (Connection connection = DatabaseConnection.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, 1, findColumn(primaryKey), String.valueOf(selected.get(primaryKey)));
-            statement.executeUpdate();
+        try {
+            crudDAO.executeDelete(tableName, primaryKey,
+                    statement -> bind(statement, 1, findColumn(primaryKey), String.valueOf(selected.get(primaryKey))));
             loadRows(false);
             showInfo("Record deleted successfully.");
-        } catch (SQLException | IllegalArgumentException ex) {
+        } catch (SQLException | IllegalArgumentException | SecurityException ex) {
             showError(friendlySqlError(ex));
         }
     }

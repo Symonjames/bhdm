@@ -39,6 +39,28 @@ public class UserDAO {
         return null;
     }
 
+    public RoleOption ensureStaffRole() throws SQLException {
+        String selectSql = "SELECT role_id, role_name FROM roles WHERE LOWER(role_name) = 'staff' LIMIT 1";
+        String insertSql = "INSERT INTO roles (role_name, description) VALUES ('Staff', 'Barangay health center staff (view-only access)')";
+        try (Connection connection = DatabaseConnection.getConnection()) {
+            try (PreparedStatement select = connection.prepareStatement(selectSql);
+                 ResultSet rs = select.executeQuery()) {
+                if (rs.next()) {
+                    return new RoleOption(rs.getInt("role_id"), rs.getString("role_name"));
+                }
+            }
+            try (PreparedStatement insert = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                insert.executeUpdate();
+                try (ResultSet keys = insert.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        return new RoleOption(keys.getInt(1), "Staff");
+                    }
+                }
+            }
+        }
+        throw new SQLException("Unable to resolve or create the default Staff role.");
+    }
+
     public List<RoleOption> findPublicRoles() throws SQLException {
         String sql = "SELECT role_id, role_name FROM roles WHERE LOWER(role_name) <> 'admin' ORDER BY role_name ASC";
         List<RoleOption> roles = new ArrayList<>();

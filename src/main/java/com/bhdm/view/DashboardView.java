@@ -2,6 +2,7 @@ package com.bhdm.view;
 
 import com.bhdm.App;
 import com.bhdm.dao.DashboardDAO;
+import com.bhdm.service.SessionManager;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -13,6 +14,7 @@ import java.util.Map;
 public class DashboardView extends BorderPane {
     private final DashboardDAO dashboardDAO = new DashboardDAO();
     private final int userId;
+    private final String roleName;
     private final boolean isAdmin;
     private final Map<String, Button> navigation = new LinkedHashMap<>();
     private final Label headerTitle = new Label("Overview");
@@ -20,7 +22,11 @@ public class DashboardView extends BorderPane {
 
     public DashboardView(App app, int userId, String fullName, String roleName) {
         this.userId = userId;
-        this.isAdmin = "Admin".equalsIgnoreCase(roleName == null ? "" : roleName.trim());
+        this.roleName = roleName == null ? "Staff" : roleName.trim();
+        this.isAdmin = SessionManager.isLoggedIn()
+                ? SessionManager.isAdmin()
+                : "Admin".equalsIgnoreCase(this.roleName);
+
         String css = App.getStylesheetUrl();
         if (css != null) {
             getStylesheets().add(css);
@@ -29,14 +35,14 @@ public class DashboardView extends BorderPane {
         setLeft(sidebar());
 
         BorderPane mainShell = new BorderPane();
-        mainShell.setTop(header(app, fullName, roleName));
+        mainShell.setTop(header(app, fullName, this.roleName));
         setCenter(mainShell);
 
         showDashboard(mainShell);
     }
 
     private HBox header(App app, String name, String role) {
-        HBox box = new HBox(16);
+        HBox box = new HBox(12);
         box.setAlignment(Pos.CENTER_LEFT);
         box.getStyleClass().add("app-header");
 
@@ -48,14 +54,20 @@ public class DashboardView extends BorderPane {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label userPill = new Label(name + "  •  " + role);
+        Label roleBadge = new Label(isAdmin ? "Admin (Full Access)" : role + " (View-Only)");
+        roleBadge.getStyleClass().add(isAdmin ? "role-badge-admin" : "role-badge-viewonly");
+
+        Label userPill = new Label(name);
         userPill.getStyleClass().add("user-pill");
 
         Button logout = new Button("Sign Out");
         logout.getStyleClass().add("btn-danger");
-        logout.setOnAction(event -> app.showLogin());
+        logout.setOnAction(event -> {
+            SessionManager.logout();
+            app.showLogin();
+        });
 
-        box.getChildren().addAll(titleGroup, spacer, userPill, logout);
+        box.getChildren().addAll(titleGroup, spacer, roleBadge, userPill, logout);
         return box;
     }
 
@@ -69,11 +81,18 @@ public class DashboardView extends BorderPane {
         Label brandSub = new Label("Barangay Health Center");
         brandSub.getStyleClass().add("sidebar-brand-sub");
         brand.getChildren().addAll(brandName, brandSub);
+        nav.getChildren().add(brand);
+
+        if (!isAdmin) {
+            Label viewOnlyBanner = new Label("Staff (View-Only)");
+            viewOnlyBanner.setMaxWidth(Double.MAX_VALUE);
+            viewOnlyBanner.getStyleClass().add("sidebar-role-banner");
+            nav.getChildren().add(viewOnlyBanner);
+        }
 
         Label section = new Label("MODULES");
         section.getStyleClass().add("sidebar-section");
-
-        nav.getChildren().addAll(brand, section);
+        nav.getChildren().add(section);
 
         addNavigation(nav, "Dashboard", () -> showDashboard(mainShell()));
         addNavigation(nav, "Households & Visits", () -> showModule(new String[]{
@@ -93,12 +112,14 @@ public class DashboardView extends BorderPane {
                 "distribution_programs", "household_allocations", "distribution_claims"
         }, "Programs & Distribution", "Administer government programs, allocations, and distribution claims"));
 
-        if (isAdmin) {
-            addNavigation(nav, "Staff & Administration", () -> showModule(new String[]{
-                    "healthcare_personnel", "staff_attendance", "users", "roles",
-                    "notifications", "reports", "audit_logs"
-            }, "Staff & Administration", "Manage personnel, attendance, user accounts, roles, notifications, and logs"));
-        }
+        String[] staffModuleTables = isAdmin
+                ? new String[]{"healthcare_personnel", "staff_attendance", "users", "roles", "notifications", "reports", "audit_logs"}
+                : new String[]{"healthcare_personnel", "staff_attendance", "notifications", "reports", "audit_logs"};
+        String staffModuleTitle = isAdmin ? "Staff & Administration" : "Staff & Reports";
+        String staffModuleSubtitle = isAdmin
+                ? "Manage personnel, attendance, user accounts, roles, notifications, and logs"
+                : "View personnel directory, attendance, notifications, reports, and audit logs";
+        addNavigation(nav, staffModuleTitle, () -> showModule(staffModuleTables, staffModuleTitle, staffModuleSubtitle));
 
         return nav;
     }
@@ -184,12 +205,15 @@ public class DashboardView extends BorderPane {
 
         VBox banner = new VBox(6);
         banner.getStyleClass().add("info-banner");
-        Label bannerTitle = new Label("Quick Guidance");
+        Label bannerTitle = new Label(isAdmin ? "Quick Guidance (Admin — Full Access)" : "Quick Guidance (Staff — View-Only Mode)");
         bannerTitle.getStyleClass().add("stat-title");
-        Label note = new Label(
-                "Select a module from the sidebar to view, search, add, edit, or delete records. "
-                + "Foreign key fields automatically load parent options in dropdown menus. "
-                + "Counts refresh whenever Dashboard is selected.");
+        Label note = new Label(isAdmin
+                ? "Select a module from the sidebar to view, search, add, edit, or delete records. "
+                  + "Foreign key fields automatically load parent options in dropdown menus. "
+                  + "Counts refresh whenever Dashboard is selected."
+                : "You are signed in with Staff (View-Only) access. You can browse, search, and inspect "
+                  + "all seeded and live health center records across every module. Add, Edit, and Delete "
+                  + "actions are restricted to Admin accounts.");
         note.setWrapText(true);
         note.getStyleClass().add("stat-detail");
         banner.getChildren().addAll(bannerTitle, note);

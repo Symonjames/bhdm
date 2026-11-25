@@ -1,10 +1,12 @@
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\App.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\config\DatabaseConnection.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\dao\AuditLogDAO.java
+C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\dao\CrudDAO.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\dao\DashboardDAO.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\dao\UserDAO.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\model\User.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\service\AuthenticationService.java
+C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\service\SessionManager.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\view\CrudTableView.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\view\DashboardView.java
 C:\xampp\htdocs\BHDM\src\main\java\com\bhdm\view\LoginView.java

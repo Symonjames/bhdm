@@ -1,4 +1,5 @@
 com\bhdm\view\CrudTableView$ColumnInfo.class
+com\bhdm\service\SessionManager.class
 com\bhdm\service\AuthenticationService.class
 com\bhdm\dao\DashboardDAO.class
 com\bhdm\view\CrudTableView$3.class
@@ -8,6 +9,7 @@ com\bhdm\dao\UserDAO.class
 com\bhdm\App.class
 com\bhdm\view\LoginView.class
 com\bhdm\view\CrudTableView$1.class
+com\bhdm\dao\CrudDAO$ParameterBinder.class
 com\bhdm\view\CrudTableView$2.class
 com\bhdm\view\CrudTableView.class
 com\bhdm\view\CrudTableView$ForeignKeyInfo.class
@@ -17,3 +19,4 @@ com\bhdm\dao\UserDAO$RoleOption.class
 com\bhdm\config\DatabaseConnection.class
 com\bhdm\view\RegisterView.class
 com\bhdm\view\DashboardView.class
+com\bhdm\dao\CrudDAO.class

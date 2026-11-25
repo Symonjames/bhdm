@@ -131,6 +131,39 @@
     -fx-font-weight: bold;
 }
 
+.role-badge-admin {
+    -fx-background-color: #e0f2fe;
+    -fx-text-fill: #0369a1;
+    -fx-border-color: #7dd3fc;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-padding: 5 12 5 12;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+}
+
+.role-badge-viewonly {
+    -fx-background-color: #fef3c7;
+    -fx-text-fill: #b45309;
+    -fx-border-color: #fcd34d;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-padding: 5 12 5 12;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+}
+
+.sidebar-role-banner {
+    -fx-background-color: rgba(254, 243, 199, 0.14);
+    -fx-border-color: rgba(252, 211, 77, 0.45);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 10 8 10;
+    -fx-text-fill: #fde68a;
+    -fx-font-size: 11.5px;
+    -fx-font-weight: bold;
+}
+
 /* ---------- Deep Navy Sidebar ---------- */
 .sidebar {
     -fx-background-color: #0f2942;

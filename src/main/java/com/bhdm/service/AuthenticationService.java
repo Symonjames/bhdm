@@ -17,17 +17,28 @@ public class AuthenticationService {
 
     public User authenticate(String username, String password) throws SQLException {
         User user = userDAO.findActiveByUsername(username);
-        if (user == null || password == null) return null;
+        if (user == null || password == null) {
+            return null;
+        }
         try {
-            return BCrypt.checkpw(password, user.getPasswordHash()) ? user : null;
+            if (BCrypt.checkpw(password, user.getPasswordHash())) {
+                SessionManager.login(user);
+                return user;
+            }
+            return null;
         } catch (IllegalArgumentException ex) {
             return null;
         }
     }
 
-    public int register(String firstName, String middleName, String lastName,
-                        String username, String password, String confirmPassword,
-                        UserDAO.RoleOption role, String contactNumber, String emailAddress) throws SQLException {
+    /**
+     * Public sign-up: always assigns the Staff role (never Admin), stores BCrypt hash,
+     * inserts with account_status = 'Active', and logs the registration in audit_logs.
+     * Unauthenticated users are always permitted to self-register.
+     */
+    public int registerStaff(String firstName, String middleName, String lastName,
+                             String username, String password, String confirmPassword,
+                             String contactNumber, String emailAddress) throws SQLException {
         String cleanFirst = firstName == null ? "" : firstName.trim();
         String cleanLast = lastName == null ? "" : lastName.trim();
         String cleanUser = username == null ? "" : username.trim();
@@ -41,12 +52,6 @@ public class AuthenticationService {
         if (cleanUser.length() > 50) {
             throw new IllegalArgumentException("Username must be 50 characters or fewer.");
         }
-        if (role == null || role.roleName() == null) {
-            throw new IllegalArgumentException("Please select a role.");
-        }
-        if ("admin".equalsIgnoreCase(role.roleName().trim())) {
-            throw new IllegalArgumentException("Public registration cannot assign the Admin role.");
-        }
         if (password == null || password.length() < 6) {
             throw new IllegalArgumentException("Password must be at least 6 characters long.");
         }
@@ -57,16 +62,17 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Username '" + cleanUser + "' is already taken.");
         }
 
+        UserDAO.RoleOption staffRole = userDAO.ensureStaffRole();
         String hash = hashPassword(password);
         int userId = userDAO.createUser(
-                role.roleId(), cleanUser, hash,
+                staffRole.roleId(), cleanUser, hash,
                 cleanFirst, middleName, cleanLast,
                 contactNumber, emailAddress
         );
         try {
-            auditLogDAO.recordRegistration(userId, cleanUser, role.roleName());
-        } catch (SQLException ignored) {
-            // Registration succeeded even if audit logging failed
+            auditLogDAO.recordRegistration(userId, cleanUser, staffRole.roleName());
+        } catch (SQLException ex) {
+            ex.printStackTrace();
         }
         return userId;
     }
